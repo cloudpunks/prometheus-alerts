@@ -24,7 +24,7 @@ groups:
 
     - alert: KubernetesDiskPressure
       expr: 'kube_node_status_condition{condition="DiskPressure",status="true"} == 1'
-      for: 2m
+      for: 10m
       labels:
         severity: critical
       annotations:
