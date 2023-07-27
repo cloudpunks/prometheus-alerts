@@ -56,7 +56,7 @@ groups:
               severity: critical
             - name: Prometheus not connected to alertmanager
               description: Prometheus cannot connect the alertmanager
-              query: 'prometheus_notifications_alertmanagers_discovered < 1'
+              query: 'prometheus_notifications_alertmanagers_discovered{instance != "localhost:9090"} < 1'
               severity: critical
             - name: Prometheus rule evaluation failures
               description: 'Prometheus encountered {{ $value }} rule evaluation failures, leading to potentially ignored alerts.'
@@ -127,7 +127,7 @@ groups:
               severity: critical
             - name: Prometheus timeserie cardinality
               description: 'The "{{ $labels.name }}" timeserie cardinality is getting very high: {{ $value }}'
-              query: 'label_replace(count by(__name__) ({__name__=~".+"}), "name", "$1", "__name__", "(.+)") > 10000'
+              query: 'label_replace(count by(__name__) ({__name__=~".+"}), "name", "$1", "__name__", "(.+)") > 20000'
               severity: warning
 
       - name: Host and hardware
@@ -146,13 +146,6 @@ groups:
                 query: '(rate(node_vmstat_pgmajfault[1m]) > 1000) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
                 severity: warning
                 for: 2m
-              - name: Host Memory is underutilized
-                description: 'Node memory is < 20% for 1 week. Consider reducing memory space. (instance {{ $labels.instance }})'
-                query: '(100 - (rate(node_memory_MemAvailable_bytes[30m]) / node_memory_MemTotal_bytes * 100) < 20) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
-                severity: info
-                for: 1w
-                comments: |
-                  You may want to increase the alert manager 'repeat_interval' for this type of alert to daily or weekly
               - name: Host unusual network throughput in
                 description: Host network interfaces are probably receiving too much data (> 100 MB/s)
                 query: '(sum by (instance) (rate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 100) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
@@ -212,17 +205,10 @@ groups:
                 severity: warning
                 for: 2m
               - name: Host high CPU load
-                description: CPU load is > 80%
-                query: '(sum by (instance) (avg by (mode, instance) (rate(node_cpu_seconds_total{mode!="idle"}[2m]))) > 0.8) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
+                description: CPU load is > 90%
+                query: '(sum by (instance) (avg by (mode, instance) (rate(node_cpu_seconds_total{mode!="idle"}[2m]))) > 0.9) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
                 severity: warning
                 for: 10m
-              - name: Host CPU is underutilized
-                description: 'CPU load is < 20% for 1 week. Consider reducing the number of CPUs.'
-                query: '(100 - (rate(node_cpu_seconds_total{mode="idle"}[30m]) * 100) < 20) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
-                severity: info
-                for: 1w
-                comments: |
-                  You may want to increase the alert manager 'repeat_interval' for this type of alert to daily or weekly
               - name: Host CPU steal noisy neighbor
                 description: CPU steal is > 10%. A noisy neighbor is killing VM performances or a spot instance may be out of credit.
                 query: '(avg by(instance) (rate(node_cpu_seconds_total{mode="steal"}[5m])) * 100 > 10) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
@@ -236,14 +222,6 @@ groups:
                 query: '(rate(node_disk_io_time_seconds_total[1m]) > 0.5) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
                 severity: warning
                 for: 5m
-              - name: Host context switching
-                description: Context switching is growing on the node (> 10000 / s)
-                query: '((rate(node_context_switches_total[5m])) / (count without(cpu, mode) (node_cpu_seconds_total{mode="idle"})) > 10000) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
-                severity: warning
-                comments: |
-                  10000 context switches is an arbitrary number.
-                  The alert threshold depends on the nature of the application.
-                  Please read: https://github.com/samber/awesome-prometheus-alerts/issues/58
               - name: Host swap is filling up
                 description: Swap is filling up (>80%)
                 query: '((1 - (node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes)) * 100 > 80) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
@@ -271,11 +249,6 @@ groups:
                 query: '(node_md_disks{state="failed"} > 0) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
                 severity: warning
                 for: 2m
-              - name: Host kernel version deviations
-                description: Different kernel versions are running
-                query: '(count(sum(label_replace(node_uname_info, "kernel", "$1", "release", "([0-9]+.[0-9]+.[0-9]+).*")) by (kernel)) > 1) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
-                severity: warning
-                for: 6h
               - name: Host OOM kill detected
                 description: OOM kill detected
                 query: '(increase(node_vmstat_oom_kill[1m]) > 0) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
@@ -318,11 +291,6 @@ groups:
                 query: '((node_timex_offset_seconds > 0.05 and deriv(node_timex_offset_seconds[5m]) >= 0) or (node_timex_offset_seconds < -0.05 and deriv(node_timex_offset_seconds[5m]) <= 0)) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
                 severity: warning
                 for: 2m
-              - name: Host clock not synchronising
-                description: 'Clock not synchronising. Ensure NTP is configured on this host.'
-                query: '(min_over_time(node_timex_sync_status[1m]) == 0 and node_timex_maxerror_seconds >= 16) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
-                severity: warning
-                for: 2m
               - name: Host requires reboot
                 description: '{{ $labels.instance }} requires a reboot.'
                 query: '(node_reboot_required > 0) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
@@ -339,6 +307,7 @@ groups:
                 description: A container has disappeared
                 query: 'time() - container_last_seen > 60'
                 severity: warning
+                for: 10m
                 comments: |
                   This rule can be very noisy in dynamic infra with legitimate container start/stop/deployment.
               - name: Container absent
@@ -1665,7 +1634,7 @@ groups:
                 description: "{{ $labels.node }} has DiskPressure condition"
                 query: 'kube_node_status_condition{condition="DiskPressure",status="true"} == 1'
                 severity: critical
-                for: 2m
+                for: 10m
               - name: Kubernetes network unavailable
                 description: "{{ $labels.node }} has NetworkUnavailable condition"
                 query: 'kube_node_status_condition{condition="NetworkUnavailable",status="true"} == 1'
@@ -2259,7 +2228,7 @@ groups:
                 description: 'Vault cluster is not healthy {{ $labels.instance }}: {{ $value | printf "%.2f"}}%'
                 query: 'sum(vault_core_active) / count(vault_core_active) <= 0.5'
                 severity: critical
-                  
+
 
       - name: Cloudflare
         exporters:
