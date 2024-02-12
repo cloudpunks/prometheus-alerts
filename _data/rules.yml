@@ -59,6 +59,7 @@ groups:
               description: 'Prometheus encountered {{ $value }} rule evaluation failures, leading to potentially ignored alerts.'
               query: 'increase(prometheus_rule_evaluation_failures_total[3m]) > 0'
               severity: critical
+              for: 5m
             - name: Prometheus template text expansion failures
               description: 'Prometheus encountered {{ $value }} template text expansion failures'
               query: 'increase(prometheus_template_text_expansion_failures_total[3m]) > 0'
