@@ -22,6 +22,7 @@ groups:
               description: A Prometheus target has disappeared. An exporter might be crashed.
               query: 'up == 0'
               severity: critical
+              for: 5m
             - name: Prometheus all targets missing
               description: A Prometheus job does not have living target anymore.
               query: 'sum by (job) (up) == 0'
